@@ -1,76 +1,56 @@
-# 服务外包项目（后端文件）
+# 基于百度飞桨和文心大模型的智能乒乓球运动分析与可视化设计
 
-[![Flask](https://img.shields.io/badge/Flask-2.0.x-blue)](https://flask.palletsprojects.com/)
-[![Vue](https://img.shields.io/badge/Vue-3.x-brightgreen)](https://vuejs.org/)
+# ball_detect使用方法
 
-## 技术栈
 
-**后端服务**  
-![Python](https://img.shields.io/badge/Python-3.9+-blue?logo=python)
-![Flask](https://img.shields.io/badge/Flask-2.0.x-blue?logo=flask)
-![Flask-CORS](https://img.shields.io/badge/Flask--CORS-3.0.x-lightgrey)
+# V3.31
+### 首先，数据库需要按照fwwb.sql的格式创建。
+### 增加了新表'video_frames_pose'，用于存储骨骼点处理后的帧信息。
+![sql.png](ball_pose/demo%2FV331%2Fsql.png)
 
-**前端服务**  
-![Vue3](https://img.shields.io/badge/Vue-3.x-brightgreen?logo=vue.js)
-![Vite](https://img.shields.io/badge/Vite-4.x-purple?logo=vite)
-![Axios](https://img.shields.io/badge/Axios-1.x-blueviolet)
+### 增加了骨骼点检测功能。
+![visual_pose.png](ball_pose/demo/V331/visual_pose.png)
 
-### 🌐 API 开发    
-1. **添加新路由**
-  文件：`app/routes/api.py`
-  ```python
-# 简单GET示例
-@api_bp.route('/test', methods=['GET'])
-def test_api():
-    return jsonify({"status": "ok"})
+# V3.29
+### 首先，数据库需要按照fwwb.sql的格式创建，增加了新表'video_status'，用于存储视频处理状态。
 
-# 带参数POST示例
-@api_bp.route('/upload', methods=['POST'])
-def upload_file():
-    file = request.files.get('file')  # 获取上传文件
-    return jsonify({"filename": file.filename})
-  ```
-2. **处理请求参数**
-  文件：`app/routes/api.py`
-  ```python
-from flask import request
+### 新增功能：视频处理状态自动刷新，
+### 处理视频时，系统将每5秒自动检查处理状态，处理完成后将自动刷新页面显示最新结果，无需手动刷新。
 
-# Query参数示例
-@api_bp.route('/search', methods=['GET'])
-def search():
-    keyword = request.args.get('q')  # 获取?q=xxx
-    return jsonify({"result": keyword})
+### 点击进行处理后，等待响应，响应后有如下界面。
 
-# JSON参数示例
-@api_bp.route('/login', methods=['POST'])
-def login():
-    data = request.json  # 获取JSON body
-    username = data.get('username')
-    return jsonify({"user": username})
-  ```
-3. **错误处理**
-  文件：`app/errors.py`
-  ```python
-@api_bp.errorhandler(404)
-def handle_404(error):
-    return jsonify({"error": "Not found"}), 404
-  ```
-4. **测试API**
-  ```bash
-# bash
-# GET测试
-curl http://localhost:5000/api/test
+![home.png](ball_pose/demo/V329/upload.png)
+### 状态显示：已上传、处理中、已完成
+#### - 已上传：显示"处理"和"删除记录"按钮
+#### - 处理中：显示"正在处理..."和"删除记录"按钮
+#### - 已完成：显示"查看视频结果"、"查看帧结果"和"删除记录"按钮
 
-# POST测试
-curl -X POST -F "file=@test.jpg" http://localhost:5000/api/upload
+![home.png](ball_pose/demo/V329/deal.png)
+![home.png](ball_pose/demo/V329/dealt.png)
 
-# 密码登录成功测试
-curl -X POST http://localhost:5000/api/password_login \
-  -H "Content-Type: application/json" \
-  -d '{"phone":"13812345678", "type":"password", "password":"password123"}'
+### 可以点击"查看视频结果""查看帧结果""删除记录"，同V3.28版本
 
-# 预期响应：
-# {"success":true, "token":"eyJhbGciOi..."}
+### 
+### 数据库同步更新
+![sql1.png](ball_pose/demo/V329/sql.png)
 
-  ```
-### 🔧 测试方法
+# V3.28
+### 首先，数据库需要按照fwwb.sql的格式创建，修改video_id和frame_id的类型为varchar(255)
+###
+### 选择文件上传，将本地内容上传到网站上，拷贝一份到项目路径ball_detect/video/input/*.mp4，
+
+### 点击进行处理后，等待响应，响应后有如下界面
+###
+![home.png](ball_pose/demo/V328/upload.png)
+###
+### 可以点击“查看视频结果”“查看帧结果”“删除记录”
+###
+![result.png](ball_pose/demo/V328/result.png)
+![frame.png](ball_pose/demo/V328/frame.png)
+###
+### 数据库同步更新
+###
+![sql1.png](ball_pose/demo/V328/sql1.png)
+![sql2.png](ball_pose/demo/V328/sql2.png)
+![sql3.png](ball_pose/demo/V328/sql3.png)
+

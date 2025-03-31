@@ -34,6 +34,15 @@ CREATE TABLE `user_videos`  (
 -- Records of user_videos
 -- ----------------------------
 
+-- Add new video_status table
+DROP TABLE IF EXISTS `video_status`;
+CREATE TABLE `video_status` (
+  `video_id` varchar(512) NOT NULL COMMENT '视频ID,主键',
+  `status` int NOT NULL COMMENT '状态',
+  PRIMARY KEY (`video_id`) USING BTREE,
+  CONSTRAINT `fk_video_status_video` FOREIGN KEY (`video_id`) REFERENCES `user_videos` (`video_id`) ON DELETE CASCADE ON UPDATE RESTRICT
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+
 -- ----------------------------
 -- Table structure for user_videos_process
 -- ----------------------------
@@ -73,10 +82,10 @@ INSERT INTO `users` VALUES (2, '李四', '19100000004', 'pbkdf2:sha256:1000000$5
 INSERT INTO `users` VALUES (6, '王五', '19100000005', 'pbkdf2:sha256:1000000$Ehtwp4i4exV2bysj$546fd73b68075c1fbd6d1b797087c9ed07cddb3e00157302567ded6315c01600');
 
 -- ----------------------------
--- Table structure for video_frames
+-- Table structure for video_frames_pose
 -- ----------------------------
-DROP TABLE IF EXISTS `video_frames`;
-CREATE TABLE `video_frames`  (
+DROP TABLE IF EXISTS `video_frames_pose`;
+CREATE TABLE `video_frames_pose`  (
   `frame_id` varchar(512) NOT NULL COMMENT '主键ID',
   `video_id` varchar(512) NOT NULL COMMENT '视频ID\r\n视频ID，外键',
   `frame_index` int NOT NULL COMMENT '帧序号',
@@ -87,7 +96,7 @@ CREATE TABLE `video_frames`  (
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
--- Records of video_frames
+-- Records of video_frames_pose
 -- ----------------------------
 
 -- ----------------------------

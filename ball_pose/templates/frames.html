@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>视频帧结果</title>
+    <style>
+        .frame-viewer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 20px;
+        }
+        .frame-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin: 20px 0;
+            overflow: hidden; /* 防止缩放时内容溢出 */
+        }
+        #currentFrame {
+            width: 100%;
+            border: 2px solid #ddd;
+            display: block;
+        }
+        .skeleton-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        .slider-container {
+            width: 80%;
+            max-width: 800px;
+            position: relative;
+            padding: 20px 0;
+        }
+        #frameSlider {
+            width: 100%;
+        }
+        .frame-info {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-family: monospace;
+        }
+        .navigation-buttons {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        .options-panel {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+            width: 80%;
+            max-width: 800px;
+        }
+        .options-panel label {
+            margin-right: 20px;
+            cursor: pointer;
+        }
+        .keypoint {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: red;
+            transform: translate(-50%, -50%);
+        }
+        .bbox {
+            position: absolute;
+            border: 2px solid blue;
+            box-sizing: border-box;
+        }
+        .hidden {
+            display: none;
+        }
+        .debug-panel {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            display: none;
+            width: 80%;
+            max-width: 800px;
+        }
+        .keypoint-label {
+            position: absolute;
+            font-size: 10px;
+            color: white;
+            background: rgba(0,0,0,0.5);
+            padding: 2px;
+            border-radius: 2px;
+            transform: translate(-50%, -100%);
+        }
+        /* 缩放控制样式 */
+        .zoom-control {
+            margin-top: 10px;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .zoom-control label {
+            min-width: 80px;
+        }
+        #zoomSlider {
+            flex: 1;
+        }
+        #zoomValue {
+            min-width: 50px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <h1>视频帧结果 - {{ filename }}</h1>
+    <a href="{{ url_for('index') }}" class="button">返回视频列表</a>
+
+    <div class="frame-viewer">
+
+        <div class="options-panel">
+            <!-- 缩放控制移到添加骨骼点检测的上方 -->
+            <div class="zoom-control">
+                <label for="zoomSlider">视图缩放:</label>
+                <input type="range" id="zoomSlider" min="100" max="200" value="100" step="10">
+                <span id="zoomValue">100%</span>
+            </div>
+            
+            <label>
+                <input type="checkbox" id="togglePoseFrames"> 添加骨骼点检测
+            </label>
+            <label>
+                <input type="checkbox" id="toggleCoordinates"> 添加坐标绘制
+            </label>
+            <div id="skeletonControls" style="display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd;">
+                <label>
+                    <input type="checkbox" id="toggleSkeleton" checked> 显示骨骼点
+                </label>
+                <label>
+                    <input type="checkbox" id="toggleBBox"> 显示边界框
+                </label>
+                <label>
+                    <input type="checkbox" id="toggleDebug"> 显示调试信息
+                </label>
+                <label>
+                    <input type="checkbox" id="toggleLabels"> 显示关键点标签
+                </label>
+            </div>
+        </div>
+
+        <div class="frame-container" id="frameContainer">
+            <img id="currentFrame" src="" alt="Current Frame">
+            <div class="skeleton-overlay" id="skeletonOverlay"></div>
+        </div>
+
+        <div id="debugPanel" class="debug-panel"></div>
+
+        <div class="slider-container">
+            <input type="range" id="frameSlider" min="1" max="100" value="1">
+            <div class="frame-info">
+                <span id="frameNumber">Frame: 1</span>
+                <span id="totalFrames">Total: 100</span>
+            </div>
+        </div>
+
+        <div class="navigation-buttons">
+            <button id="prevFrame">上一帧</button>
+            <button id="nextFrame">下一帧</button>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        const videoName = "{{ filename }}".split('.')[0];
+        const normalFrames = {{ frames|tojson }};
+        let poseFrames = [];
+        let currentFrames = normalFrames;
+        let currentFrameIndex = 0;
+        let poseData = null;
+        let debugPanel = document.getElementById('debugPanel');
+        let zoomLevel = 100;
+
+        // DOM元素
+        const frameSlider = document.getElementById('frameSlider');
+        const currentFrameImg = document.getElementById('currentFrame');
+        const frameNumberEl = document.getElementById('frameNumber');
+        const totalFramesEl = document.getElementById('totalFrames');
+        const togglePoseFrames = document.getElementById('togglePoseFrames');
+        const toggleCoordinates = document.getElementById('toggleCoordinates');
+        const skeletonControls = document.getElementById('skeletonControls');
+        const toggleSkeleton = document.getElementById('toggleSkeleton');
+        const toggleBBox = document.getElementById('toggleBBox');
+        const toggleDebug = document.getElementById('toggleDebug');
+        const toggleLabels = document.getElementById('toggleLabels');
+        const skeletonOverlay = document.getElementById('skeletonOverlay');
+        const frameContainer = document.getElementById('frameContainer');
+        const zoomSlider = document.getElementById('zoomSlider');
+        const zoomValue = document.getElementById('zoomValue');
+
+        // 初始化帧数量
+        frameSlider.max = normalFrames.length;
+        totalFramesEl.textContent = `Total: ${normalFrames.length}`;
+
+        // 调试日志函数 - 显示当前帧的骨骼点坐标和边界框坐标
+        function logDebug(frameData) {
+            if (debugPanel && toggleDebug.checked) {
+                let debugText = "";
+                
+                if (frameData && frameData.instances && frameData.instances.length > 0) {
+                    debugText += `=== 帧 ${currentFrameIndex + 1} 人体实例信息 ===\n\n`;
+                    
+                    frameData.instances.forEach((instance, idx) => {
+                        debugText += `人体 #${idx + 1}:\n`;
+                        
+                        // 显示边界框坐标
+                        if (instance.bbox && instance.bbox.length > 0) {
+                            const bbox = instance.bbox[0];
+                            debugText += `边界框: [x1=${bbox[0].toFixed(1)}, y1=${bbox[1].toFixed(1)}, x2=${bbox[2].toFixed(1)}, y2=${bbox[3].toFixed(1)}]\n`;
+                        }
+                        
+                        // 显示关键点坐标
+                        if (instance.keypoints) {
+                            debugText += "关键点坐标:\n";
+                            const keyPointNames = poseData.meta_info.keypoint_id2name || {};
+                            
+                            instance.keypoints.forEach((kpt, kidx) => {
+                                const name = keyPointNames[kidx] || `点${kidx}`;
+                                const score = instance.keypoint_scores ? instance.keypoint_scores[kidx].toFixed(2) : "N/A";
+                                {#debugText += `  ${name}: [${kpt[0].toFixed(1)}, ${kpt[1].toFixed(1)}], 置信度: ${score}\n`;#}
+                                debugText += `  ${name}: [${kpt[0].toFixed(1)}, ${kpt[1].toFixed(1)}]`;
+                            });
+                        }
+                        
+                        debugText += "\n";
+                    });
+                } else {
+                    debugText = `未找到帧 ${currentFrameIndex + 1} 的骨骼数据`;
+                }
+                
+                debugPanel.textContent = debugText;
+            }
+        }
+
+        // 清除调试面板
+        function clearDebugPanel() {
+            if (debugPanel) {
+                debugPanel.textContent = '';
+            }
+        }
+
+        // 切换调试面板
+        toggleDebug.addEventListener('change', function() {
+            debugPanel.style.display = this.checked ? 'block' : 'none';
+            if (this.checked) {
+                updateFrame(); // 重新加载当前帧以显示调试信息
+            } else {
+                clearDebugPanel();
+            }
+        });
+
+        // 加载骨骼帧
+        function loadPoseFrames() {
+            // 替换路径，从正常帧路径构建骨骼帧路径
+            poseFrames = normalFrames.map(path =>
+                path.replace(`/${videoName}/`, `/${videoName}_pose/`));
+        }
+
+        // 加载骨骼数据
+        function loadPoseData() {
+            if (poseData !== null) return Promise.resolve();
+
+            return fetch(`/pose_data/${videoName}.mp4`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to load pose data');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    poseData = data;
+                    const frameInfo = poseData.instance_info.find(f => f.frame_id === currentFrameIndex + 1);
+                    logDebug(frameInfo);
+                })
+                .catch(error => {
+                    console.error('Error loading pose data:', error);
+                    clearDebugPanel();
+                    logDebug({ error: `加载骨骼数据出错: ${error.message}` });
+                    toggleCoordinates.checked = false;
+                    alert('无法加载骨骼数据。请确保视频已经通过人体骨骼检测处理。');
+                });
+        }
+
+        // 应用缩放
+        function applyZoom() {
+            frameContainer.style.maxWidth = `${8 * zoomLevel}px`;
+            zoomValue.textContent = `${zoomLevel}%`;
+
+            // 如果有骨骼坐标，需要重新渲染
+            if (toggleCoordinates.checked) {
+                updateFrame();
+            }
+        }
+
+        // 更新当前帧
+        function updateFrame() {
+            // 更新帧
+            currentFrameImg.src = currentFrames[currentFrameIndex];
+            frameNumberEl.textContent = `Frame: ${currentFrameIndex + 1}`;
+            frameSlider.value = currentFrameIndex + 1;
+
+            // 清空骨骼叠加层
+            skeletonOverlay.innerHTML = '';
+
+            // 清除旧的调试信息
+            clearDebugPanel();
+
+            // 如果启用坐标绘制，绘制骨骼和边界框
+            if (toggleCoordinates.checked && poseData) {
+                renderSkeleton();
+            }
+        }
+
+        // 渲染骨骼
+        function renderSkeleton() {
+            // 找到当前帧的骨骼数据
+            const frameData = poseData.instance_info.find(f => f.frame_id === currentFrameIndex + 1);
+
+            if (frameData && frameData.instances) {
+                logDebug(frameData);
+
+                // 等待图像加载完成，确保骨骼点位置正确
+                currentFrameImg.onload = function() {
+                    const displayWidth = currentFrameImg.clientWidth;
+                    const displayHeight = currentFrameImg.clientHeight;
+                    const originalWidth = currentFrameImg.naturalWidth;
+                    const originalHeight = currentFrameImg.naturalHeight;
+
+                    // 计算缩放比例
+                    const scaleX = displayWidth / originalWidth;
+                    const scaleY = displayHeight / originalHeight;
+
+                    // 获取关键点名称映射
+                    const keyPointNames = poseData.meta_info.keypoint_id2name || {};
+
+                    // 为每个实例绘制骨骼点和边界框
+                    frameData.instances.forEach((instance, instanceIdx) => {
+                        try {
+                            // 绘制骨骼点
+                            if (instance.keypoints && instance.keypoint_scores) {
+                                instance.keypoints.forEach((kpt, idx) => {
+                                    const score = instance.keypoint_scores[idx];
+                                    if (score > 0.3) { // 置信度阈值
+                                        const point = document.createElement('div');
+                                        point.className = 'keypoint';
+                                        point.classList.toggle('hidden', !toggleSkeleton.checked);
+
+                                        // 正确缩放原始坐标到显示尺寸
+                                        const x = kpt[0] * scaleX;
+                                        const y = kpt[1] * scaleY;
+
+                                        point.style.left = `${x}px`;
+                                        point.style.top = `${y}px`;
+                                        skeletonOverlay.appendChild(point);
+
+                                        // 如果启用了标签，添加关键点名称标签
+                                        if (toggleLabels.checked && keyPointNames[idx]) {
+                                            const label = document.createElement('div');
+                                            label.className = 'keypoint-label';
+                                            label.textContent = keyPointNames[idx];
+                                            label.style.left = `${x}px`;
+                                            label.style.top = `${y}px`;
+                                            skeletonOverlay.appendChild(label);
+                                        }
+                                    }
+                                });
+                            }
+
+                            // 绘制边界框
+                            if (instance.bbox && instance.bbox.length > 0) {
+                                const bboxCoords = instance.bbox[0]; // 获取嵌套数组中的第一个元素
+
+                                if (bboxCoords && bboxCoords.length >= 4) {
+                                    const bbox = document.createElement('div');
+                                    bbox.className = 'bbox';
+                                    bbox.classList.toggle('hidden', !toggleBBox.checked);
+
+                                    // 正确缩放边界框坐标到显示尺寸
+                                    const x = bboxCoords[0] * scaleX;
+                                    const y = bboxCoords[1] * scaleY;
+                                    const width = (bboxCoords[2] - bboxCoords[0]) * scaleX;
+                                    const height = (bboxCoords[3] - bboxCoords[1]) * scaleY;
+
+                                    bbox.style.left = `${x}px`;
+                                    bbox.style.top = `${y}px`;
+                                    bbox.style.width = `${width}px`;
+                                    bbox.style.height = `${height}px`;
+                                    skeletonOverlay.appendChild(bbox);
+                                }
+                            }
+                        } catch (err) {
+                            console.error(`渲染实例 ${instanceIdx} 出错:`, err);
+                        }
+                    });
+                };
+            } else {
+                logDebug({ error: `未找到帧 ${currentFrameIndex + 1} 的数据` });
+            }
+        }
+
+        // 事件监听器
+
+        // 切换帧类型
+        togglePoseFrames.addEventListener('change', function() {
+            if (this.checked) {
+                // 如果未加载骨骼帧，先加载
+                if (poseFrames.length === 0) {
+                    loadPoseFrames();
+                }
+                currentFrames = poseFrames;
+            } else {
+                currentFrames = normalFrames;
+            }
+            updateFrame();
+        });
+
+        // 切换坐标绘制
+        toggleCoordinates.addEventListener('change', function() {
+            skeletonControls.style.display = this.checked ? 'block' : 'none';
+
+            if (this.checked) {
+                loadPoseData().then(() => {
+                    updateFrame();
+                });
+            } else {
+                skeletonOverlay.innerHTML = '';
+            }
+        });
+
+        // 切换骨骼点显示
+        toggleSkeleton.addEventListener('change', function() {
+            document.querySelectorAll('.keypoint').forEach(el => {
+                el.classList.toggle('hidden', !this.checked);
+            });
+        });
+
+        // 切换边界框显示
+        toggleBBox.addEventListener('change', function() {
+            document.querySelectorAll('.bbox').forEach(el => {
+                el.classList.toggle('hidden', !this.checked);
+            });
+        });
+
+        // 切换标签显示
+        toggleLabels.addEventListener('change', function() {
+            if (this.checked && toggleCoordinates.checked) {
+                updateFrame(); // 重新渲染带有标签的帧
+            } else {
+                document.querySelectorAll('.keypoint-label').forEach(el => {
+                    el.remove();
+                });
+            }
+        });
+
+        // 缩放控制
+        zoomSlider.addEventListener('input', function() {
+            zoomLevel = parseInt(this.value);
+            applyZoom();
+        });
+
+        // 滑块更改
+        frameSlider.addEventListener('input', function() {
+            currentFrameIndex = parseInt(this.value) - 1;
+            updateFrame();
+        });
+
+        // 上一帧
+        document.getElementById('prevFrame').addEventListener('click', function() {
+            if (currentFrameIndex > 0) {
+                currentFrameIndex--;
+                updateFrame();
+            }
+        });
+
+        // 下一帧
+        document.getElementById('nextFrame').addEventListener('click', function() {
+            if (currentFrameIndex < currentFrames.length - 1) {
+                currentFrameIndex++;
+                updateFrame();
+            }
+        });
+
+        // 加载第一帧
+        updateFrame();
+    </script>
+</body>
+</html>
