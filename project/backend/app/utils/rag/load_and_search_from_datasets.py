@@ -4,7 +4,7 @@ from sentence_transformers import SentenceTransformer
 _INDEX_CACHE = None
 _LINES_CACHE = None
 
-def load_dataset_embedding(index_file: str = "网安RAG_index", text_file: str = "../data/texts_10000.txt"):   
+def load_dataset_embedding(index_file: str = "../data/expert_index.index", text_file: str = "../data/expert_texts.txt"):   
     global _INDEX_CACHE, _LINES_CACHE 
     
     delimiter = "<<<DOC>>>"

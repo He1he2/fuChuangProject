@@ -1,13 +1,21 @@
 import networkx as nx
 import spacy
+import os
+import re
+import torch
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader, TextLoader
 from langchain_community.retrievers import BM25Retriever
 from langchain_community.vectorstores import FAISS
 from langchain.retrievers import EnsembleRetriever
 from rank_bm25 import BM25Okapi
-from sentence_transformers import CrossEncoder
-
+# from sentence_transformers import CrossEncoder
+CROSS_ENCODER_MODEL = "../models/ms-marco-MiniLM-L6-v2"
+INDEX_FILE = "../data/faiss_index"
+device = "cuda" if torch.cuda.is_available() else "cpu"
+retrieval_pipeline = None
+_INDEX_CACHE = None
+_LINES_CACHE = None
 
 nlp = spacy.load("en_core_web_lg")  # python -m spacy download en_core_web_lg
 
@@ -110,7 +118,7 @@ def build_vector_store(texts, embeddings):
 
 
 def build_retrieval_pipeline(texts, vector_store):
-    reranker = CrossEncoder(CROSS_ENCODER_MODEL, device=device)
+    # reranker = CrossEncoder(CROSS_ENCODER_MODEL, device=device)
     text_contents = [doc.page_content for doc in texts]
     bm25_retriever = BM25Retriever.from_texts(
         text_contents,
@@ -125,6 +133,6 @@ def build_retrieval_pipeline(texts, vector_store):
     return {
         "ensemble": ensemble_retriever,
         "texts": text_contents,
-        "reranker": reranker,
+        # "reranker": reranker,
         "knowledge_graph": knowledge_graph,
     }

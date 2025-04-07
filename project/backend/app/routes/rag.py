@@ -93,14 +93,8 @@ def chat():
                     else []
                 )
                 docs = graph_docs + retrieved_docs if graph_docs else retrieved_docs
-                # 重排序
-                pairs = [[prompt, doc.page_content] for doc in docs]
-                scores = retrieval_pipeline["reranker"].predict(pairs)
-                ranked_docs = [
-                    doc for _, doc in sorted(zip(scores, docs), reverse=True)
-                ]
 
-                retrieved_context = "\n".join([doc.page_content for doc in ranked_docs])
+                retrieved_context = "\n".join([doc.page_content for doc in docs])
                 context = context + "\n" + retrieved_context
             else:
                 context = "\n".join(
