@@ -9,8 +9,8 @@ const R = {
         return {
             messages: [],
             inputMessage: "",
-            selectedApi: "openai",
-            selectedModel: "gpt-4o",
+            selectedApi: "qianfan",
+            selectedModel: "ernie-x1",
             selectedMode: "custom",
             selectedExpert: "Cybersecurity-RAG",
             graphRagEnabled: !0,
@@ -19,9 +19,11 @@ const R = {
                     { value: "gpt-4o", text: "gpt-4o" },
                     { value: "gpt-3.5-turbo", text: "gpt-3.5-turbo" }
                 ],
-                volcengine: [
-                    { value: "deepseek-r1", text: "deepseek-r1" },
-                    { value: "deepseek-v3", text: "deepseek-v3" }
+                qianfan: [
+                    { value: "ernie-x1", text: "ERNIE X1" }, 
+                    { value: "ernie-4.5", text: "ERNIE 4.5" }, 
+                    { value: "deepseek-r1", text: "DeepSeek R1" }, 
+                    { value: "deepseek-v3", text: "DeepSeek V3" }
                 ]
             },
             modes: [
@@ -183,8 +185,8 @@ function I(o, e, i, p, l, n) {
                         class: "form-select"
                     }, e[14] || (
                         e[14] = [
-                            s("option", { value: "openai" }, "OpenAI", -1),
-                            s("option", { value: "volcengine" }, "DeepSeek", -1)
+                            s("option", { value: "qianfan" }, "百度千帆", -1),
+                            s("option", { value: "openai" }, "OpenAI", -1)
                         ]
                     ), 512), [[c, l.selectedApi]]),
                     a(s("select", {

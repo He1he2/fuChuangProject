@@ -22,11 +22,12 @@ CROSS_ENCODER_MODEL = "../models/ms-marco-MiniLM-L6-v2"
 
 load_dotenv()
 openai_api_key = os.getenv("OPENAI_API_KEY")
-ark_api_key = os.getenv("ARK_API_KEY")
-ARK_MODEL_MAPPING = {
-    "deepseek-r1": "deepseek-r1-250120",
-    "deepseek-v3": "deepseek-v3-241226",
-    # "doubao-1.5-pro": "doubao-1-5-pro-256k-250115",
+qianfan_api_key = os.getenv("QIANFAN_API_KEY")
+QIANFAN_MODEL_MAPPING = {
+    "ernie-x1":"ernie-x1-32k-preview",
+    "ernie-4.5":"ernie-4.5-8k-preview",
+    "deepseek-r1":"deepseek-r1",
+    "deepseek-v3": "deepseek-v3-241226"
 }
 rag_bp = Blueprint('api', __name__)
     
@@ -144,13 +145,13 @@ Answer:"""
         except Exception as e:
             return f"Error: {str(e)}"
 
-    def generate_ark():
+    def generate_qianfan():
         try:
             client = OpenAI(
-                api_key=ark_api_key,
-                base_url="https://ark.cn-beijing.volces.com/api/v3",
+                api_key=qianfan_api_key,
+                base_url='https://qianfan.baidubce.com/v2',
             )
-            model = ARK_MODEL_MAPPING.get(selected_model, selected_model)
+            model = QIANFAN_MODEL_MAPPING.get(selected_model, selected_model)
             completion = client.chat.completions.create(
                 model=model,
                 messages=[
@@ -165,8 +166,8 @@ Answer:"""
 
     if selected_api.lower() == "openai":
         generator = generate_openai()
-    elif selected_api.lower() in ["火山引擎", "volcengine"]:
-        generator = generate_ark()
+    elif selected_api.lower() in ["百度千帆", "qianfan"]:
+        generator = generate_qianfan()
     else:
 
         def error_gen():
