@@ -9,6 +9,7 @@ const R = {
         return {
             messages: [],
             inputMessage: "",
+            report: "",
             selectedApi: "qianfan",
             selectedModel: "ernie-x1",
             selectedMode: "custom",
@@ -20,28 +21,29 @@ const R = {
                     { value: "gpt-3.5-turbo", text: "gpt-3.5-turbo" }
                 ],
                 qianfan: [
-                    { value: "ernie-x1", text: "ERNIE X1" }, 
-                    { value: "ernie-4.5", text: "ERNIE 4.5" }, 
-                    { value: "deepseek-r1", text: "DeepSeek R1" }, 
+                    { value: "ernie-x1", text: "ERNIE X1" },
+                    { value: "ernie-4.5", text: "ERNIE 4.5" },
+                    { value: "deepseek-r1", text: "DeepSeek R1" },
                     { value: "deepseek-v3", text: "DeepSeek V3" }
                 ]
             },
             modes: [
                 { value: "custom", label: "自定义" },
                 { value: "expert", label: "专家" }
-            ]
+            ],
+            isGenerating: false,
         };
     },
     watch: {
         selectedApi(newApi) {
-          const models = this.apiModels[newApi];
-          if (models && models.length > 0) {
-            this.selectedModel = models[0].value;
-          } else {
-            this.selectedModel = '';
-          }
+            const models = this.apiModels[newApi];
+            if (models && models.length > 0) {
+                this.selectedModel = models[0].value;
+            } else {
+                this.selectedModel = '';
+            }
         }
-      },
+    },
     methods: {
         async sendMessage() {
             const content = this.inputMessage.trim();
@@ -63,6 +65,7 @@ const R = {
                         chat_history: chatHistory,
                         mode,
                         graphrag,
+                        report: this.report,
                         selected_api: this.selectedApi,
                         selected_model: this.selectedModel
                     })
@@ -108,18 +111,16 @@ const R = {
                 });
 
                 const result = await response.json();
-                if (response.ok) {
+                if (response.ok && result.status === "success") {  // 判断 status 字段
                     console.log("文件处理和嵌入生成成功：", result);
                     // alert("文件上传成功！知识图谱节点数：" + result.total_nodes + ", 边数：" + result.total_edges);
                 } else {
-                    // 处理失败
-                    console.error("文件上传失败：", result.error);
+                    console.error("文件上传失败：", result.error || "未知错误");
                     // alert("文件上传失败：" + result.error);
                 }
             } catch (error) {
-                // 网络请求失败的处理
                 console.error("上传异常：", error);
-                //   alert("上传异常：" + error.message);
+                // alert("上传异常：" + error.message);
             }
         },
         clearHistory() {
@@ -128,7 +129,7 @@ const R = {
         toggleModeOptions() { },
 
         mockStream(text) {
-            const lines = text.split('\n'); // 这里 text 是字符串
+            const lines = text.split('\n');
             return lines;
         },
         async load_embedding() {
@@ -142,20 +143,54 @@ const R = {
                     }
                 });
                 const result = await response.json();
-                if (response.ok) {
+                if (response.ok && result.status === "success") {
                     console.log("Embedding 加载成功：", result);
-                    // 你可以在这里设置响应的数据到前端变量
                 } else {
-                    console.error("加载失败：", result.error);
-                    //   alert("加载失败：" + result.error);
+                    console.error("加载失败：", result.error || "未知错误");
                 }
             } catch (error) {
                 console.error("请求异常：", error);
-                // alert("请求异常：" + error.message);
             } finally {
                 this.loading = false;
             }
         },
+        async generateReport() {
+            console.log("生成报告...");
+            try {
+                document.getElementById("download-btn").style.display = "none";
+                document.getElementById("generate-btn").style.display = "none";
+                document.getElementById("generating-btn").style.display = "inline-block";
+                this.loading = true;
+                const response = await fetch("/api/generate_report", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                });
+                const result = await response.json();
+
+                if (result.report) {
+                    this.report = result.report;
+                    document.getElementById("generate-btn").style.display = "inline-block";
+                    document.getElementById("generating-btn").style.display = "none";
+                    document.getElementById("download-btn").style.display = "inline-block";
+                    // this.generateDownloadLink(result.report);
+                } else {
+                    console.error("未能获取报告内容");
+                }
+            } catch (error) {
+                console.error("请求异常：", error);
+            } finally {
+                this.loading = false;
+            }
+        },
+        downloadReport() {
+            const blob = new Blob([this.report], { type: 'text/plain;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = '运动动作分析报告.md';
+            link.click();
+        }
     }
 };
 
@@ -243,11 +278,35 @@ function I(o, e, i, p, l, n) {
                     ])
                 ], 512), [[h, l.selectedMode === "custom"]])
             ]),
-            s("button", {
-                onClick: e[10] || (e[10] = (...t) => n.clearHistory && n.clearHistory(...t)),
-                class: "btn clear-btn"
-            }, "清除历史")
-        ]),
+
+            s("label", {class: "button-group"}, [
+                s("button", {
+                    onClick: e[11] || (e[11] = (...t) => n.generateReport && n.generateReport(...t)),
+                    id: "generate-btn",
+                    class: "btn clear-btn",
+                    style: "display: inline-block;"
+                }, "生成分析报告", 512),
+                s("button", {
+                    id: "generating-btn",
+                    class: "btn clear-btn",
+                    style: "display: none;"
+                }, "生成中", 512),
+            ]),
+            s("label", {class: "button-group"}, [
+                s("button", {
+                    onClick: e[16] || (e[16] = (...t) => n.downloadReport && n.downloadReport(...t)),
+                    id: "download-btn",
+                    class: "btn clear-btn",
+                    style: "display: none;"
+                }, "下载报告", 512)
+            ]),
+            s("label", null, [
+                s("button", {
+                    onClick: e[10] || (e[10] = (...t) => n.clearHistory && n.clearHistory(...t)),
+                    class: "btn clear-btn"
+                }, "清除历史")
+            ])
+        ], 512),
         s("div", T, [
             s("div", O, [
                 (d(!0), r(m, null,

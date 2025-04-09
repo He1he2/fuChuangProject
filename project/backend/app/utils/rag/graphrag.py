@@ -3,6 +3,7 @@ import spacy
 import os
 import re
 import torch
+import numpy as np
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader, TextLoader
 from langchain_community.retrievers import BM25Retriever
@@ -31,29 +32,20 @@ def build_knowledge_graph(docs):
 
 def retrieve_from_graph(query, G, top_k=5):
     query_doc = nlp(query)
-    
-    if not query_doc.ents:
-        query_vector = query_doc.vector
-    else:
-        query_vector = query_doc.ents  
-
+    query_vector = query_doc.vector  
 
     similarity_scores = []
     for node in G.nodes:
         node_doc = nlp(node)
-        
-        if not node_doc.ents:
-            node_vector = node_doc.vector
-        else:
-            node_vector = node_doc.ents  
+        node_vector = node_doc.vector  
 
-        similarity = query_vector @ node_vector / (query_vector.norm() * node_vector.norm())  
+        similarity = query_vector @ node_vector / (np.linalg.norm(query_vector)* np.linalg.norm(node_vector))
         similarity_scores.append((node, similarity))
 
     similarity_scores.sort(key=lambda x: x[1], reverse=True)
-    
-    matched_nodes = [node for node, score in similarity_scores[:top_k]]
-    
+
+    matched_nodes = [node for node, _ in similarity_scores[:top_k]]  
+
     if matched_nodes:
         related_nodes = []
         for node in matched_nodes:
