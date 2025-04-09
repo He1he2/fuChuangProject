@@ -1,0 +1,4 @@
+video_name,start_frame,end_frame,predicted_class,confidence,top1_class,top2_class,top3_class,top4_class,top5_class,top1_score,top2_score,top3_score,top4_score,top5_score
+test9_000.mp4,0,7,弹击,0.6605,弹击,搓球,挑球,攻球,发球,0.6605,0.2037,0.1028,0.0215,0.0102
+test9_001.mp4,8,15,弹击,0.6563,弹击,搓球,挑球,攻球,发球,0.6563,0.2110,0.1026,0.0215,0.0073
+test9_002.mp4,16,23,弹击,0.6665,弹击,搓球,挑球,攻球,发球,0.6665,0.2073,0.1009,0.0180,0.0062

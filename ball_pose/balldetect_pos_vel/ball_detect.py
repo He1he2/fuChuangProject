@@ -110,19 +110,19 @@ def infer_model(frames, model, fps):  # 添加fps参数
 
         # 绘制背景
         cv2.rectangle(preview_frame,
-                      (10, 10),
-                      (20 + max_width, 20 + total_height),
+                      (10, 40),
+                      (20 + max_width, 50 + total_height),
                       bg_color, -1)
 
         # 绘制坐标行
         cv2.putText(preview_frame, coord_line,
-                    (20, 20 + coord_height),
+                    (20, 50 + coord_height),
                     cv2.FONT_HERSHEY_SIMPLEX, text_scale,
                     text_color, text_thickness)
 
         # 绘制速度行
         cv2.putText(preview_frame, speed_line,
-                    (20, 20 + coord_height + 5 + speed_height),
+                    (20, 50 + coord_height + 5 + speed_height),
                     cv2.FONT_HERSHEY_SIMPLEX, text_scale,
                     text_color, text_thickness)
 

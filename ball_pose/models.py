@@ -86,6 +86,29 @@ def process_video_async(input_path, filename, original_video_id, user_id, mysql_
                 conn.close()
         print(f"✅ 所有帧记录写入完成")
 
+        # 在"骨骼帧记录写入完成"之后，状态更新之前添加以下代码
+        print(f"🎬 开始动作识别: {filename}")
+        # os.makedirs('video/output_action', exist_ok=True)
+
+        action_video_path = os.path.join('video/output', filename)
+        action_cmd = [
+            'python', 'mmaction/actionpredict.py',
+            '--config_path', 'mmaction/utils/configs.py',
+            '--checkpoint_path', 'mmaction/utils/model.pth',
+            '--label_map', 'mmaction/utils/label_map.txt',
+            '--video_path', action_video_path,
+            '--output_dir', 'video/output_action',
+            '--filename', filename
+        ]
+
+        print(f"⚙️ 正在运行动作识别脚本: {' '.join(action_cmd)}")
+        action_result = subprocess.run(action_cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
+
+        if action_result.returncode != 0:
+            print(f"❌ 动作识别失败: {action_result.stderr}")
+        else:
+            print(f"✅ 动作识别完成")
+
         # 新增：人体骨骼检测处理
         print(f"🧍 开始人体骨骼检测: {filename}")
         os.makedirs('video/output_pose', exist_ok=True)
@@ -113,7 +136,6 @@ def process_video_async(input_path, filename, original_video_id, user_id, mysql_
             # 提取骨骼帧
             pose_frame_dir = os.path.join('frames', f"{os.path.splitext(filename)[0]}_pose")
             os.makedirs(pose_frame_dir, exist_ok=True)
-
             pose_video_path = os.path.join('video/output_pose', filename)
             pose_frame_script = [
                 'python', 'mmpose/video2frame.py',
@@ -152,6 +174,7 @@ def process_video_async(input_path, filename, original_video_id, user_id, mysql_
                 print(f"✅ 所有骨骼帧记录写入完成")
             else:
                 print(f"❌ 骨骼帧提取失败: {pose_frame_result.stderr}")
+
 
     except Exception as e:
         print(f"❌ 异步处理异常: {e}")

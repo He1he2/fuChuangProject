@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>乒乓球动作分析与指导系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .controls button {
+            background: #3498db;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            margin: 0 10px;
+            cursor: pointer;
+        }
+        .controls button:hover {
+            background: #2980b9;
+        }
+        #frameSlider {
+            width: 80%;
+            margin: 10px 0;
+        }
+        .display-area {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+        }
+        .image-container {
+            position: relative;
+            border: 1px solid #ddd;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 800px;
+        }
+        .analysis-container {
+            width: 100%;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+        }
+        .angle-charts {
+            width: 60%;
+        }
+        .angle-info {
+            width: 35%;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .instruction-panel {
+            width: 100%;
+            margin-top: 20px;
+            background: #e8f4fc;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 5px solid #3498db;
+        }
+        .keypoint {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: red;
+        }
+        .keypoint-label {
+            position: absolute;
+            font-size: 10px;
+            color: blue;
+        }
+        .skeleton-line {
+            position: absolute;
+            background-color: yellow;
+            height: 2px;
+            transform-origin: 0 0;
+        }
+        .status-good {
+            color: green;
+            font-weight: bold;
+        }
+        .status-warning {
+            color: orange;
+            font-weight: bold;
+        }
+        .status-bad {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>乒乓球动作分析与指导系统</h1>
+
+        <div class="controls">
+            <button id="prevFrame">上一帧</button>
+            <span id="frameNumber">帧: 1</span>
+            <button id="nextFrame">下一帧</button>
+            <div style="width: 100%; text-align: center;">
+                <input type="range" id="frameSlider" min="1" value="1" step="1">
+            </div>
+        </div>
+
+        <div class="display-area">
+            <div class="image-container" id="imageContainer">
+                <img id="currentFrame" style="max-width: 100%;">
+                <div id="skeletonOverlay"></div>
+            </div>
+
+            <div class="analysis-container">
+                <div class="angle-charts">
+                    <div id="armAngleChart" style="width: 100%; height: 300px;"></div>
+                </div>
+
+                <div class="angle-info">
+                    <h3>关键角度数据</h3>
+                    <div id="angleData"></div>
+                </div>
+
+                <div class="instruction-panel">
+                    <h3>乒乓球动作指导</h3>
+                    <div id="instructionText"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 初始化变量
+        let poseData = null;
+        let currentFrameIndex = 0;
+        let totalFrames = 0;
+        const baseImagePath = "../frames/test5_pose/";
+        const jsonPath = "../video/output_pose/results_test5.json";
+
+        // DOM元素
+        const currentFrameImg = document.getElementById('currentFrame');
+        const frameNumberEl = document.getElementById('frameNumber');
+        const frameSlider = document.getElementById('frameSlider');
+        const skeletonOverlay = document.getElementById('skeletonOverlay');
+        const angleDataDiv = document.getElementById('angleData');
+        const instructionTextDiv = document.getElementById('instructionText');
+
+        // 初始化图表
+        const armAngleChart = echarts.init(document.getElementById('armAngleChart'));
+
+        // 加载姿态数据
+        async function loadPoseData() {
+            try {
+                const response = await fetch(jsonPath);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                poseData = await response.json();
+
+                // 设置总帧数
+                if (poseData.instance_info) {
+                    const frameIds = poseData.instance_info.map(f => f.frame_id);
+                    totalFrames = Math.max(...frameIds);
+                    frameSlider.max = totalFrames;
+
+                    console.log(`加载了${totalFrames}帧数据`);
+                    updateFrame();
+                }
+            } catch (error) {
+                console.error("加载姿态数据失败:", error);
+            }
+        }
+
+        // 计算两点之间的角度（与水平线的夹角，单位:度）
+        function calculateAngle(p1, p2) {
+            const deltaY = p2[1] - p1[1];
+            const deltaX = p2[0] - p1[0];
+            // 计算弧度并转换为角度
+            let angleRad = Math.atan2(deltaY, deltaX);
+            let angleDeg = angleRad * (180 / Math.PI);
+            return angleDeg;
+        }
+
+        // 计算三点形成的角度（弯曲角度，单位:度）
+        function calculateBendAngle(p1, p2, p3) {
+            // 计算向量
+            const vec1 = [p1[0] - p2[0], p1[1] - p2[1]];
+            const vec2 = [p3[0] - p2[0], p3[1] - p2[1]];
+
+            // 计算点积
+            const dotProduct = vec1[0] * vec2[0] + vec1[1] * vec2[1];
+
+            // 计算模长
+            const mag1 = Math.sqrt(vec1[0] * vec1[0] + vec1[1] * vec1[1]);
+            const mag2 = Math.sqrt(vec2[0] * vec2[0] + vec2[1] * vec2[1]);
+
+            // 计算夹角（弧度）
+            const cosAngle = dotProduct / (mag1 * mag2);
+            const angleRad = Math.acos(Math.max(-1, Math.min(1, cosAngle))); // 确保在[-1,1]范围内
+
+            // 转换为角度
+            return angleRad * (180 / Math.PI);
+        }
+
+        // 更新当前帧
+        function updateFrame() {
+            // 更新帧号显示
+            frameNumberEl.textContent = `帧: ${currentFrameIndex + 1}`;
+            frameSlider.value = currentFrameIndex + 1;
+
+            // 设置图片路径
+            const frameNumber = String(currentFrameIndex).padStart(6, '0');
+            const imagePath = `${baseImagePath}test5_${frameNumber}.jpg`;
+            currentFrameImg.src = imagePath;
+
+            // 清空骨骼叠加层
+            skeletonOverlay.innerHTML = '';
+
+            // 如果有姿态数据，绘制骨骼和计算角度
+            if (poseData) {
+                renderSkeletonAndAngles();
+            }
+        }
+
+        // 渲染骨骼和计算角度
+        function renderSkeletonAndAngles() {
+            // 找到当前帧的骨骼数据
+            const frameData = poseData.instance_info.find(f => f.frame_id === currentFrameIndex + 1);
+
+            if (frameData && frameData.instances && frameData.instances.length > 0) {
+                // 获取骨骼点映射
+                const keyPointNames = poseData.meta_info.keypoint_id2name || {};
+                const keyPointMap = {};
+
+                // 等待图像加载完成
+                currentFrameImg.onload = function() {
+                    const displayWidth = currentFrameImg.clientWidth;
+                    const displayHeight = currentFrameImg.clientHeight;
+                    const originalWidth = currentFrameImg.naturalWidth;
+                    const originalHeight = currentFrameImg.naturalHeight;
+
+                    // 计算缩放比例
+                    const scaleX = displayWidth / originalWidth;
+                    const scaleY = displayHeight / originalHeight;
+
+                    // 处理第一个实例的数据（通常是人）
+                    const instance = frameData.instances[0];
+
+                    if (instance.keypoints && instance.keypoint_scores) {
+                        // 先构建关键点映射
+                        instance.keypoints.forEach((kpt, idx) => {
+                            if (keyPointNames[idx]) {
+                                keyPointMap[keyPointNames[idx]] = {
+                                    position: kpt,
+                                    score: instance.keypoint_scores[idx],
+                                    scaledPosition: [kpt[0] * scaleX, kpt[1] * scaleY]
+                                };
+
+                                // 绘制骨骼点
+                                if (instance.keypoint_scores[idx] > 0.3) {
+                                    const point = document.createElement('div');
+                                    point.className = 'keypoint';
+                                    point.style.left = `${kpt[0] * scaleX - 4}px`;
+                                    point.style.top = `${kpt[1] * scaleY - 4}px`;
+                                    skeletonOverlay.appendChild(point);
+
+                                    // 添加标签
+                                    const label = document.createElement('div');
+                                    label.className = 'keypoint-label';
+                                    label.textContent = keyPointNames[idx];
+                                    label.style.left = `${kpt[0] * scaleX + 5}px`;
+                                    label.style.top = `${kpt[1] * scaleY - 10}px`;
+                                    skeletonOverlay.appendChild(label);
+                                }
+                            }
+                        });
+
+                        // 绘制骨骼连接线
+                        drawSkeletonLines(keyPointMap, scaleX, scaleY);
+
+                        // 计算角度
+                        const angles = calculateKeyAngles(keyPointMap);
+                        displayAngles(angles);
+                        updateAngleChart(angles);
+
+                        // 生成动作指导
+                        generatePingPongInstructions(angles);
+                    }
+                };
+            }
+        }
+
+        // 绘制骨骼连接线
+        function drawSkeletonLines(keyPointMap, scaleX, scaleY) {
+            // 定义需要连接的骨骼点对
+            const skeletonPairs = [
+                ['left_shoulder', 'right_shoulder'],
+                ['left_shoulder', 'left_elbow'],
+                ['left_elbow', 'left_wrist'],
+                ['right_shoulder', 'right_elbow'],
+                ['right_elbow', 'right_wrist'],
+                ['left_shoulder', 'left_hip'],
+                ['right_shoulder', 'right_hip'],
+                ['left_hip', 'right_hip']
+            ];
+
+            // 绘制连接线
+            skeletonPairs.forEach(pair => {
+                const start = keyPointMap[pair[0]];
+                const end = keyPointMap[pair[1]];
+
+                if (start && end && start.score > 0.3 && end.score > 0.3) {
+                    const startX = start.position[0] * scaleX;
+                    const startY = start.position[1] * scaleY;
+                    const endX = end.position[0] * scaleX;
+                    const endY = end.position[1] * scaleY;
+
+                    // 计算线的长度和角度
+                    const length = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+                    const angle = Math.atan2(endY - startY, endX - startX) * 180 / Math.PI;
+
+                    // 创建线段
+                    const line = document.createElement('div');
+                    line.className = 'skeleton-line';
+                    line.style.width = `${length}px`;
+                    line.style.left = `${startX}px`;
+                    line.style.top = `${startY}px`;
+                    line.style.transform = `rotate(${angle}deg)`;
+
+                    skeletonOverlay.appendChild(line);
+                }
+            });
+        }
+
+        // 计算关键角度
+        function calculateKeyAngles(keyPointMap) {
+            const angles = {};
+
+            // 检查是否有必要的关键点
+            if (keyPointMap['left_shoulder'] && keyPointMap['left_elbow'] && keyPointMap['left_wrist']) {
+                // 左手臂弯曲角度
+                angles.leftElbowAngle = calculateBendAngle(
+                    keyPointMap['left_shoulder'].position,
+                    keyPointMap['left_elbow'].position,
+                    keyPointMap['left_wrist'].position
+                );
+
+                // 左上臂与水平线夹角
+                angles.leftUpperArmAngle = calculateAngle(
+                    keyPointMap['left_shoulder'].position,
+                    keyPointMap['left_elbow'].position
+                );
+
+                // 左前臂与水平线夹角
+                angles.leftForearmAngle = calculateAngle(
+                    keyPointMap['left_elbow'].position,
+                    keyPointMap['left_wrist'].position
+                );
+            }
+
+            if (keyPointMap['right_shoulder'] && keyPointMap['right_elbow'] && keyPointMap['right_wrist']) {
+                // 右手臂弯曲角度
+                angles.rightElbowAngle = calculateBendAngle(
+                    keyPointMap['right_shoulder'].position,
+                    keyPointMap['right_elbow'].position,
+                    keyPointMap['right_wrist'].position
+                );
+
+                // 右上臂与水平线夹角
+                angles.rightUpperArmAngle = calculateAngle(
+                    keyPointMap['right_shoulder'].position,
+                    keyPointMap['right_elbow'].position
+                );
+
+                // 右前臂与水平线夹角
+                angles.rightForearmAngle = calculateAngle(
+                    keyPointMap['right_elbow'].position,
+                    keyPointMap['right_wrist'].position
+                );
+            }
+
+            // 肩部角度（肩膀和髋部的夹角）
+            if (keyPointMap['left_shoulder'] && keyPointMap['right_shoulder'] &&
+                keyPointMap['left_hip'] && keyPointMap['right_hip']) {
+
+                // 计算肩部线段的角度
+                const shoulderAngle = calculateAngle(
+                    keyPointMap['left_shoulder'].position,
+                    keyPointMap['right_shoulder'].position
+                );
+
+                // 计算髋部线段的角度
+                const hipAngle = calculateAngle(
+                    keyPointMap['left_hip'].position,
+                    keyPointMap['right_hip'].position
+                );
+
+                // 身体扭转角度（肩膀线与髋部线的夹角差）
+                angles.torsoRotationAngle = Math.abs(shoulderAngle - hipAngle);
+            }
+
+            return angles;
+        }
+
+        // 显示角度数据
+        function displayAngles(angles) {
+            let html = '';
+
+            if (angles.leftElbowAngle !== undefined) {
+                html += `<p>左肘弯曲角度: <span class="${getAngleStatusClass(angles.leftElbowAngle, 90, 70, 130)}">${angles.leftElbowAngle.toFixed(1)}°</span></p>`;
+                html += `<p>左上臂角度: ${angles.leftUpperArmAngle.toFixed(1)}°</p>`;
+                html += `<p>左前臂角度: ${angles.leftForearmAngle.toFixed(1)}°</p>`;
+            }
+
+            if (angles.rightElbowAngle !== undefined) {
+                html += `<p>右肘弯曲角度: <span class="${getAngleStatusClass(angles.rightElbowAngle, 90, 70, 130)}">${angles.rightElbowAngle.toFixed(1)}°</span></p>`;
+                html += `<p>右上臂角度: ${angles.rightUpperArmAngle.toFixed(1)}°</p>`;
+                html += `<p>右前臂角度: ${angles.rightForearmAngle.toFixed(1)}°</p>`;
+            }
+
+            if (angles.torsoRotationAngle !== undefined) {
+                html += `<p>身体扭转角度: <span class="${getAngleStatusClass(angles.torsoRotationAngle, 10, 0, 30)}">${angles.torsoRotationAngle.toFixed(1)}°</span></p>`;
+            }
+
+            angleDataDiv.innerHTML = html;
+        }
+
+        // 根据角度值获取状态类
+        function getAngleStatusClass(value, optimal, min, max) {
+            if (value >= min && value <= max) {
+                if (Math.abs(value - optimal) <= 10) {
+                    return 'status-good';
+                } else {
+                    return 'status-warning';
+                }
+            } else {
+                return 'status-bad';
+            }
+        }
+
+        // 更新角度图表
+        function updateAngleChart(angles) {
+            const option = {
+                title: {
+                    text: '关键角度分析'
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    formatter: '{b}: {c}°'
+                },
+                legend: {
+                    data: ['左肘角度', '右肘角度', '身体扭转']
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: ['当前角度'],
+                    axisLabel: {
+                        rotate: 0
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: '角度(°)',
+                    min: 0,
+                    max: 180,
+                    axisLine: {
+                        show: true
+                    },
+                    axisLabel: {
+                        formatter: '{value}°'
+                    }
+                },
+                series: [
+                    {
+                        name: '左肘角度',
+                        type: 'bar',
+                        data: [angles.leftElbowAngle || 0],
+                        itemStyle: {
+                            color: '#3498db'
+                        },
+                        markLine: {
+                            data: [
+                                { yAxis: 90, name: '最佳角度', lineStyle: { color: 'green' } }
+                            ]
+                        }
+                    },
+                    {
+                        name: '右肘角度',
+                        type: 'bar',
+                        data: [angles.rightElbowAngle || 0],
+                        itemStyle: {
+                            color: '#e74c3c'
+                        }
+                    },
+                    {
+                        name: '身体扭转',
+                        type: 'bar',
+                        data: [angles.torsoRotationAngle || 0],
+                        itemStyle: {
+                            color: '#9b59b6'
+                        }
+                    }
+                ]
+            };
+
+            armAngleChart.setOption(option);
+        }
+
+        // 生成乒乓球动作指导
+        function generatePingPongInstructions(angles) {
+            let instructions = [];
+            let overall = "整体评估：";
+
+            // 评估右手臂（假设右手是持拍手）
+            if (angles.rightElbowAngle !== undefined) {
+                if (angles.rightElbowAngle < 70) {
+                    instructions.push("右手臂弯曲过度，建议适当伸展以增加击球力量。");
+                } else if (angles.rightElbowAngle > 130) {
+                    instructions.push("右手臂过于伸直，可能导致击球不稳定，建议适当弯曲。");
+                } else if (angles.rightElbowAngle > 85 && angles.rightElbowAngle < 95) {
+                    instructions.push("✓ 右手臂弯曲角度接近90度，这是一个良好的准备姿势。");
+                }
+            }
+
+            // 评估左手臂（假设左手是辅助平衡的手）
+            if (angles.leftElbowAngle !== undefined) {
+                if (angles.leftElbowAngle < 70) {
+                    instructions.push("左手臂弯曲过度，影响身体平衡，建议稍微放松。");
+                } else if (angles.leftElbowAngle > 130) {
+                    instructions.push("左手臂过于伸直，可以适当弯曲以辅助身体平衡。");
+                } else if (angles.leftElbowAngle > 85 && angles.leftElbowAngle < 95) {
+                    instructions.push("✓ 左手臂弯曲角度良好，有助于维持身体平衡。");
+                }
+            }
+
+            // 评估身体扭转
+            if (angles.torsoRotationAngle !== undefined) {
+                if (angles.torsoRotationAngle < 5) {
+                    instructions.push("身体扭转不足，建议增加扭转以储备更多击球能量。");
+                } else if (angles.torsoRotationAngle > 30) {
+                    instructions.push("身体扭转过大，可能影响击球精准度，建议控制扭转幅度。");
+                } else if (angles.torsoRotationAngle >= 10 && angles.torsoRotationAngle <= 20) {
+                    instructions.push("✓ 身体扭转角度适中，有利于发力和控制。");
+                }
+            }
+
+            // 综合评估
+            let goodPoints = instructions.filter(i => i.includes("✓")).length;
+            if (goodPoints >= 2) {
+                overall += "<span class='status-good'>姿势良好</span>，继续保持！";
+            } else if (instructions.length === 0) {
+                overall = "无法提供完整评估，请确保骨骼点被正确检测。";
+            } else {
+                overall += "<span class='status-warning'>姿势需要调整</span>，请参考以下建议。";
+            }
+
+            // 乒乓球技术提示
+            let tips = [
+                "<b>技术提示：</b> 乒乓球击球时，手肘弯曲角度通常在70-100度之间最为理想。",
+                "<b>平衡提示：</b> 保持身体稳定性，确保重心略微前倾。",
+                "<b>发力提示：</b> 击球动作应由腰部发力，通过身体旋转带动手臂。"
+            ];
+
+            // 组合所有指导信息
+            let html = `<p>${overall}</p>`;
+            if (instructions.length > 0) {
+                html += "<ul>";
+                instructions.forEach(instruction => {
+                    html += `<li>${instruction}</li>`;
+                });
+                html += "</ul>";
+            }
+            html += "<p>" + tips.join("</p><p>") + "</p>";
+
+            instructionTextDiv.innerHTML = html;
+        }
+
+        // 事件监听
+        document.getElementById('prevFrame').addEventListener('click', function() {
+            if (currentFrameIndex > 0) {
+                currentFrameIndex--;
+                updateFrame();
+            }
+        });
+
+        document.getElementById('nextFrame').addEventListener('click', function() {
+            if (currentFrameIndex < totalFrames - 1) {
+                currentFrameIndex++;
+                updateFrame();
+            }
+        });
+
+        frameSlider.addEventListener('input', function() {
+            currentFrameIndex = parseInt(this.value) - 1;
+            updateFrame();
+        });
+
+        // 页面加载后初始化
+        window.onload = function() {
+            loadPoseData();
+        };
+    </script>
+</body>
+</html>

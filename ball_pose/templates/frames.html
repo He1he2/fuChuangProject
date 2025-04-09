@@ -132,7 +132,7 @@
                 <input type="range" id="zoomSlider" min="100" max="200" value="100" step="10">
                 <span id="zoomValue">100%</span>
             </div>
-            
+
             <label>
                 <input type="checkbox" id="togglePoseFrames"> 添加骨骼点检测
             </label>
@@ -212,24 +212,24 @@
         function logDebug(frameData) {
             if (debugPanel && toggleDebug.checked) {
                 let debugText = "";
-                
+
                 if (frameData && frameData.instances && frameData.instances.length > 0) {
                     debugText += `=== 帧 ${currentFrameIndex + 1} 人体实例信息 ===\n\n`;
-                    
+
                     frameData.instances.forEach((instance, idx) => {
                         debugText += `人体 #${idx + 1}:\n`;
-                        
+
                         // 显示边界框坐标
                         if (instance.bbox && instance.bbox.length > 0) {
                             const bbox = instance.bbox[0];
                             debugText += `边界框: [x1=${bbox[0].toFixed(1)}, y1=${bbox[1].toFixed(1)}, x2=${bbox[2].toFixed(1)}, y2=${bbox[3].toFixed(1)}]\n`;
                         }
-                        
+
                         // 显示关键点坐标
                         if (instance.keypoints) {
                             debugText += "关键点坐标:\n";
                             const keyPointNames = poseData.meta_info.keypoint_id2name || {};
-                            
+
                             instance.keypoints.forEach((kpt, kidx) => {
                                 const name = keyPointNames[kidx] || `点${kidx}`;
                                 const score = instance.keypoint_scores ? instance.keypoint_scores[kidx].toFixed(2) : "N/A";
@@ -237,13 +237,13 @@
                                 debugText += `  ${name}: [${kpt[0].toFixed(1)}, ${kpt[1].toFixed(1)}]`;
                             });
                         }
-                        
+
                         debugText += "\n";
                     });
                 } else {
                     debugText = `未找到帧 ${currentFrameIndex + 1} 的骨骼数据`;
                 }
-                
+
                 debugPanel.textContent = debugText;
             }
         }

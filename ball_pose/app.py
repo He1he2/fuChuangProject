@@ -11,7 +11,7 @@ mysql_config = {
     'host': 'localhost',
     'user': 'root',
     'password': 'lx20040622',
-    'database': 'fwwb'
+    'database': 'fwwb1'
 }
 
 # Status constants (add to top of app.py)
@@ -153,7 +153,7 @@ def serve_input_video(filename):
 
 @app.route('/video/output_pose/<filename>')
 def serve_output_video(filename):
-    return send_from_directory('video/output_pose', filename)
+    return send_from_directory('video/output_action', filename)
 
 @app.route('/frames/<path:subpath>')
 def serve_frames(subpath):
@@ -243,6 +243,14 @@ def delete_file(filename):
         for f in os.listdir(pose_frame_dir):
             os.remove(os.path.join(pose_frame_dir, f))
         os.rmdir(pose_frame_dir)
+
+    action_output_path = os.path.join('video/output_action', filename)
+    if os.path.exists(action_output_path):
+        os.remove(action_output_path)
+
+    action_csv_path = os.path.join('video/output_action', f"{os.path.splitext(filename)[0]}.csv")
+    if os.path.exists(action_csv_path):
+        os.remove(action_csv_path)
 
     return redirect(url_for('index'))
 

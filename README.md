@@ -1,7 +1,9 @@
 # 基于百度飞桨和文心大模型的智能乒乓球运动分析与可视化设计
 
 # ball_detect使用方法
-
+# V4.9
+### 新增功能：动作识别
+![action.png](ball_pose%2Fdemo%2FV49%2Faction.png)
 
 # V3.31
 ### 首先，数据库需要按照fwwb.sql的格式创建。
