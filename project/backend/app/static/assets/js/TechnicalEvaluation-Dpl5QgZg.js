@@ -48,7 +48,7 @@ const R = {
         async sendMessage() {
             const content = this.inputMessage.trim();
             if (!content) return;
-
+            console.log("Sending message:", content);
             this.messages.push({ role: "user", content });
             this.inputMessage = "";
             const prompt = content;
@@ -113,7 +113,7 @@ const R = {
                 const result = await response.json();
                 if (response.ok && result.status === "success") {  // 判断 status 字段
                     console.log("文件处理和嵌入生成成功：", result);
-                    // alert("文件上传成功！知识图谱节点数：" + result.total_nodes + ", 边数：" + result.total_edges);
+                    alert("文件上传成功！知识图谱节点数：" + result.total_nodes + ", 边数：" + result.total_edges);
                 } else {
                     console.error("文件上传失败：", result.error || "未知错误");
                     // alert("文件上传失败：" + result.error);
@@ -281,7 +281,7 @@ function I(o, e, i, p, l, n) {
 
             s("label", {class: "button-group"}, [
                 s("button", {
-                    onClick: e[11] || (e[11] = (...t) => n.generateReport && n.generateReport(...t)),
+                    onClick: e[30] || (e[30] = (...t) => n.generateReport && n.generateReport(...t)),
                     id: "generate-btn",
                     class: "btn clear-btn",
                     style: "display: inline-block;"
@@ -294,7 +294,7 @@ function I(o, e, i, p, l, n) {
             ]),
             s("label", {class: "button-group"}, [
                 s("button", {
-                    onClick: e[16] || (e[16] = (...t) => n.downloadReport && n.downloadReport(...t)),
+                    onClick: e[31] || (e[31] = (...t) => n.downloadReport && n.downloadReport(...t)),
                     id: "download-btn",
                     class: "btn clear-btn",
                     style: "display: none;"

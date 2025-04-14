@@ -10,8 +10,6 @@ from langchain_community.retrievers import BM25Retriever
 from langchain_community.vectorstores import FAISS
 from langchain.retrievers import EnsembleRetriever
 from rank_bm25 import BM25Okapi
-# from sentence_transformers import CrossEncoder
-CROSS_ENCODER_MODEL = "../models/ms-marco-MiniLM-L6-v2"
 INDEX_FILE = "../data/faiss_index"
 device = "cuda" if torch.cuda.is_available() else "cpu"
 retrieval_pipeline = None
@@ -38,8 +36,13 @@ def retrieve_from_graph(query, G, top_k=5):
     for node in G.nodes:
         node_doc = nlp(node)
         node_vector = node_doc.vector  
+        norm_q = np.linalg.norm(query_vector)
+        norm_n = np.linalg.norm(node_vector)
 
-        similarity = query_vector @ node_vector / (np.linalg.norm(query_vector)* np.linalg.norm(node_vector))
+        if norm_q == 0 or norm_n == 0:
+            similarity = 0
+        else:
+            similarity = query_vector @ node_vector / (norm_q * norm_n)
         similarity_scores.append((node, similarity))
 
     similarity_scores.sort(key=lambda x: x[1], reverse=True)
@@ -110,7 +113,6 @@ def build_vector_store(texts, embeddings):
 
 
 def build_retrieval_pipeline(texts, vector_store):
-    # reranker = CrossEncoder(CROSS_ENCODER_MODEL, device=device)
     text_contents = [doc.page_content for doc in texts]
     bm25_retriever = BM25Retriever.from_texts(
         text_contents,

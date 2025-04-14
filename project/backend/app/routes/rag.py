@@ -77,7 +77,7 @@ def upload_files():
 @rag_bp.route("/chat", methods=["POST"])
 def chat():
     global retrieval_pipeline
-    global _INDEX_CACHE, _LINES_CACHE
+    # global _INDEX_CACHE, _LINES_CACHE
     data = request.get_json()
     prompt = data.get("prompt", "")
     chat_history = data.get("chat_history", "")
@@ -105,8 +105,8 @@ def chat():
                 )
                 docs = graph_docs + retrieved_docs if graph_docs else retrieved_docs
 
-                retrieved_context = "\n".join([doc.page_content for doc in docs])
-                context = context + "\n" + retrieved_context
+                context = "\n".join([doc.page_content for doc in docs])
+                
             else:
                 context = "\n".join(
                     f"[Source {i+1}]: {doc.page_content}"
@@ -120,24 +120,40 @@ def chat():
             f"[Source {i+1}]: {doc}" for i, doc in enumerate(retrieved_docs)
         )
     print(context)
-    system_prompt = f"""Use the chat history to maintain context:
-Chat History:
+    system_prompt = f"""你是一名专业的乒乓球教练和运动动作分析专家。
+
+请根据下方提供的上下文信息，对用户的输入进行分析，并用**纯文本格式**撰写你的回答。你的回答应由结构清晰的段落组成，每个段落之间用两个换行符（\\n\\n）分隔。
+
+不要使用 Markdown、项目符号或编号列表。请使用完整的语句和自然的语言过渡，使你的回答像一篇规范的运动分析报告，便于前端美观展示。
+
+=== 对话历史 ===
 {chat_history}
 
-User's Analysis Report:
+=== 用户此前的分析报告 ===
 {report}
 
-Analyze the following user input based on the context of table tennis and provide detailed feedback:
-1. **Technical Analysis**: Analyze the user's body movement data (skeleton points) and ball trajectory. Identify strengths and weaknesses in their technique.
-2. **Posture & Movement**: Offer suggestions to improve posture, grip, and swing mechanics based on the provided data.
-3. **Injury Prevention**: Provide medical insights on avoiding injuries (e.g., wrist, elbow, shoulder) based on user movement patterns.
-4. **Improvement Suggestions**: Recommend drills and exercises to enhance the player's performance based on movement analysis.
-
-Context:
+=== 上下文信息 ===
 {context}
 
-Question: {prompt}
-Answer:"""
+=== 任务 ===
+请根据用户的骨骼点数据、击球轨迹和相关背景信息，对其乒乓球动作表现进行结构化分析。你的回答应包含以下四个部分，每部分为一个段落，段落之间使用两个换行符（\\n\\n）分隔：
+
+1. 技术分析：分析用户的击球动作技术，包括优势和不足。
+2. 姿态与动作：评估用户的身体姿势、握拍方式、挥拍动作，并提出改进建议。
+3. 伤病预防：识别可能存在的运动风险，并提供预防常见运动损伤的建议。
+4. 提升建议：推荐适合该用户的训练方式、动作练习或提升方法。
+
+请确保每个部分都使用自然语言进行撰写，段落清晰，逻辑通顺，整体内容完整专业。
+=== 注意事项 ===
+1、当没有报告输入时，正常回答用户问题
+
+用户输入：
+{prompt}
+
+输出（请使用纯文本格式，段落之间）：
+"""
+
+
 
     def generate_openai():
         try:
@@ -160,7 +176,7 @@ Answer:"""
             completion = client.chat.completions.create(
                 model=model,
                 messages=[
-                    {"role": "system", "content": "你是一个智能助手"},
+                    {"role": "system", "content": "你是乒乓球运动动作分析专家"},
                     {"role": "user", "content": system_prompt},
                 ],
                 stream=False,
@@ -192,14 +208,15 @@ def load_dataset_embedding_route():
         _INDEX_CACHE, _LINES_CACHE = load_dataset_embedding(
             index_file=index_file, text_file=text_file
         )
-        return jsonify(
-            {
-                "status": "success",
-                "message": "Dataset embedding loaded successfully!",
-                "index_cache_length": len(_INDEX_CACHE) if _INDEX_CACHE else 0,
-                "lines_cache_length": len(_LINES_CACHE) if _LINES_CACHE else 0,
-            }
-        )
+        index_count = _INDEX_CACHE.ntotal if hasattr(_INDEX_CACHE, "ntotal") else 0
+        lines_count = len(_LINES_CACHE) if _LINES_CACHE is not None else 0
+
+        return jsonify({
+            "status": "success",
+            "message": "Dataset embedding loaded successfully!",
+            "index_cache_length": index_count,
+            "lines_cache_length": lines_count,
+        })
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 500
 
@@ -220,15 +237,15 @@ def generate_report():
 
         # Build system prompt for the current batch of frames
         system_prompt = f"""
-你是一个专业的乒乓球运动动作分析专家，擅长通过人体骨骼关键点坐标进行动作识别和姿态评估。请根据以下每帧图像中进行乒乓球对打时的人体骨骼点信息，结合字段说明，对每个人的动作进行详细分析。分析内容应包括但不限于：
+你是一个专业的乒乓球运动动作分析专家，擅长通过人体骨骼关键点坐标进行动作识别和姿态评估。请根据以下每帧图像中进行乒乓球对打时的人体骨骼点信息，结合字段说明，对前两个人的动作进行详细分析。分析内容应包括但不限于：
 
 1. 动作是否规范（如站立、跑步、跳跃等是否符合常规标准）； 
 2. 姿态是否稳定，是否存在不协调或危险的动作；
 3. 动作幅度是否合理；
 4. 如存在问题，请指出具体关键点及改进建议。
 
-为每个人进行分析，并且考虑到当前图像帧的编号，便于最后根据整体的运动轨迹进行分析。
-输出标签使用：人体1、人体2、人体3
+只为前两个人体进行分析，并且考虑到当前图像帧的编号，便于最后根据整体的运动轨迹进行分析。
+输出标签使用：人体1、人体2
 以下是骨骼点字段说明（metadata）： 
 {meta_info}
 

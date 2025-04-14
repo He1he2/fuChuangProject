@@ -1,6 +1,6 @@
 import faiss
 import numpy as np
-from sentence_transformers import SentenceTransformer
+from transformers import AutoTokenizer, AutoModel
 _INDEX_CACHE = None
 _LINES_CACHE = None
 
@@ -28,7 +28,8 @@ def load_dataset_embedding(index_file: str = "../data/expert_index.index", text_
 
 def search_from_index(query,  k=5):
 
-    model = SentenceTransformer("../models/bge-m3")
+    tokenizer = AutoTokenizer.from_pretrained("./models/sup-simcse-bert-base-uncased")
+    model = AutoModel.from_pretrained("./models/sup-simcse-bert-base-uncased")
     query_vector = model.encode(query, convert_to_numpy=True)
     query_vector = np.array(query_vector, dtype=np.float32).reshape(1, -1)
 
