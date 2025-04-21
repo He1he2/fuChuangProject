@@ -4,6 +4,7 @@ import time
 from flask import Blueprint, jsonify, request
 from flask import Flask, jsonify, request
 from dotenv import load_dotenv
+from jwt import decode
 import openai
 import torch
 from ..utils.models import User
@@ -24,7 +25,6 @@ from ..utils.rag.load_and_search_from_datasets import (
     search_from_index,
 )
 from ..utils.rag.load_data import load_skeleton_keypoint
-from .upload import USER_ID, FILENAME
 from ..config import BaseConfig
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -223,10 +223,17 @@ def load_dataset_embedding_route():
 
 @rag_bp.route("/generate_report", methods=["POST"])
 def generate_report():
-    # output_path = str(Path(BaseConfig.PROCESSED_FOLDER)/FILENAME)
-    pose_video_path = str(Path(BaseConfig.POSE_FOLDER)/f"user_{USER_ID}")
+    auth_header = request.headers.get('Authorization')
+    token = auth_header.split(' ')[1]
+    payload = decode(token, BaseConfig.SECRET_KEY, algorithms=["HS256"])
+    user_phone = payload['phone']
 
-    file_path = f"{pose_video_path}/results_{FILENAME.split('.')[0]}.json"
+    user = User.query.filter_by(phone=user_phone).first()
+    if not user:
+        return jsonify({"success": False, "message": "用户不存在"}), 404
+    pose_video_path = os.path.join(BaseConfig.POSE_FOLDER, f"user_{user.user_id}")
+    json_files = [f.name for f in pose_video_path.glob("*.json")]
+    file_path = f"{pose_video_path}/{json_files[0]}"
     if not os.path.exists(file_path):
         return jsonify({"status": "error", "error": "File not found"}), 404
     else:

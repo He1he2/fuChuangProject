@@ -162,12 +162,19 @@ const R = {
                 document.getElementById("generate-btn").style.display = "none";
                 document.getElementById("generating-btn").style.display = "inline-block";
                 this.loading = true;
+
+                const token = localStorage.getItem("token");  
+                // const userId = localStorage.getItem("user_id");
+
                 const response = await fetch("/api/generate_report", {
                     method: "POST",
                     headers: {
-                        "Content-Type": "application/json"
-                    }
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}` 
+                    },
+                    body: JSON.stringify({})  
                 });
+
                 const result = await response.json();
 
                 if (result.report) {
@@ -175,7 +182,6 @@ const R = {
                     document.getElementById("generate-btn").style.display = "inline-block";
                     document.getElementById("generating-btn").style.display = "none";
                     document.getElementById("download-btn").style.display = "inline-block";
-                    // this.generateDownloadLink(result.report);
                 } else {
                     console.error("未能获取报告内容");
                 }
@@ -280,7 +286,7 @@ function I(o, e, i, p, l, n) {
                 ], 512), [[h, l.selectedMode === "custom"]])
             ]),
 
-            s("label", {class: "button-group"}, [
+            s("label", { class: "button-group" }, [
                 s("button", {
                     onClick: e[30] || (e[30] = (...t) => n.generateReport && n.generateReport(...t)),
                     id: "generate-btn",
@@ -293,7 +299,7 @@ function I(o, e, i, p, l, n) {
                     style: "display: none;"
                 }, "生成中", 512),
             ]),
-            s("label", {class: "button-group"}, [
+            s("label", { class: "button-group" }, [
                 s("button", {
                     onClick: e[31] || (e[31] = (...t) => n.downloadReport && n.downloadReport(...t)),
                     id: "download-btn",

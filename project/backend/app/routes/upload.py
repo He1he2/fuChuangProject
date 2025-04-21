@@ -23,7 +23,6 @@ HISTORY_STATUS_UPLOADED = "processing"
 @upload_bp.route('/upload', methods=['POST'])
 @jwt_required
 def upload_video():
-    global USER_ID, FILENAME
     try:
         # 基础验证
         if 'video' not in request.files:
@@ -58,8 +57,6 @@ def upload_video():
 
         # 保存文件到文件系统
         file.save(save_path)
-        USER_ID = user.user_id
-        FILENAME = os.path.basename(save_path)
         # 数据库事务操作
         try:
             # 创建视频记录
