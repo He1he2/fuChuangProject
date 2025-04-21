@@ -7,9 +7,7 @@ from ..utils.models import User, UserVideo, History, VideoStatus
 from ..config import BaseConfig
 from ..utils.security import jwt_required
 
-from ..utils.task import process_video_async
-USER_ID = 3
-FILENAME = "20250419093317052.json"
+from ..utils.task import process_video_async, generate_report_async
 
 upload_bp = Blueprint('upload', __name__)
 
@@ -93,6 +91,8 @@ def upload_video():
                 original_video_id=video_id,
                 user_id=user.user_id
             )
+
+            generate_report_async(os.path.basename(save_path), user.user_id)
 
         # 异步任务处理
         except Exception as e:

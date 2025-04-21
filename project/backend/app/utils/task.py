@@ -5,6 +5,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from ..utils.models import db, UserVideoProcess, VideoFramesProcess, VideoFramesPose, VideoStatus, History
 from .security import async_task
 from ..config import BaseConfig
+from ..routes.rag import generate_report
 
 @async_task
 def process_video_async(input_path, filename, original_video_id, user_id):
@@ -212,3 +213,15 @@ def process_video_async(input_path, filename, original_video_id, user_id):
     finally:
         db.session.close()
         print(f"🏁 处理任务结束: {filename}\n")
+def generate_report_async(filename, user_id):
+    pose_user_dir = Path(BaseConfig.POSE_FOLDER) / f"user_{user_id}"
+    file_path = f'{pose_user_dir} / results_' + f'{os.path.splitext(os.path.basename(filename))[0]}.json'
+    if not os.path.exists(file_path):
+        print(f"❌ 报告文件不存在: {file_path}")
+        return
+    else:
+        print(f"📄 开始生成报告: {filename}")
+        report = generate_report(file_path, user_id, filename)
+        print(f"✅ 报告生成完成: {report}")
+        
+

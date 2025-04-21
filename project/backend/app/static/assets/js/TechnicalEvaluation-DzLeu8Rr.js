@@ -155,8 +155,8 @@ const R = {
                 this.loading = false;
             }
         },
-        async generateReport() {
-            console.log("生成报告...");
+        async loadReport() {
+            console.log("加载报告...");
             try {
                 document.getElementById("download-btn").style.display = "none";
                 document.getElementById("generate-btn").style.display = "none";
@@ -166,7 +166,7 @@ const R = {
                 const token = localStorage.getItem("token");  
                 // const userId = localStorage.getItem("user_id");
 
-                const response = await fetch("/api/generate_report", {
+                const response = await fetch("/api/load_report", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -288,16 +288,16 @@ function I(o, e, i, p, l, n) {
 
             s("label", { class: "button-group" }, [
                 s("button", {
-                    onClick: e[30] || (e[30] = (...t) => n.generateReport && n.generateReport(...t)),
+                    onClick: e[30] || (e[30] = (...t) => n.loadReport && n.loadReport(...t)),
                     id: "generate-btn",
                     class: "btn clear-btn",
                     style: "display: inline-block;"
-                }, "生成分析报告", 512),
+                }, "加载分析报告", 512),
                 s("button", {
                     id: "generating-btn",
                     class: "btn clear-btn",
                     style: "display: none;"
-                }, "生成中", 512),
+                }, "加载中", 512),
             ]),
             s("label", { class: "button-group" }, [
                 s("button", {

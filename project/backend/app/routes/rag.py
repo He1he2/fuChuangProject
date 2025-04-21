@@ -26,6 +26,7 @@ from ..utils.rag.load_and_search_from_datasets import (
 )
 from ..utils.rag.load_data import load_skeleton_keypoint
 from ..config import BaseConfig
+
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 load_dotenv()
@@ -44,6 +45,9 @@ INDEX_FILE = "./app/data/faiss_index"
 retrieval_pipeline = None
 _INDEX_CACHE = None
 _LINES_CACHE = None
+
+_report_paths = []
+_N = 0
 
 
 @rag_bp.route("/upload_eval", methods=["POST"])
@@ -107,7 +111,7 @@ def chat():
                 docs = graph_docs + retrieved_docs if graph_docs else retrieved_docs
 
                 context = "\n".join([doc.page_content for doc in docs])
-                
+
             else:
                 context = "\n".join(
                     f"[Source {i+1}]: {doc.page_content}"
@@ -117,9 +121,7 @@ def chat():
             context = " "
     else:
         docs = search_from_index(prompt, k=5)
-        context = "\n".join(
-            f"[Source {i+1}]: {doc}" for i, doc in enumerate(docs)
-        )
+        context = "\n".join(f"[Source {i+1}]: {doc}" for i, doc in enumerate(docs))
     system_prompt = f"""你是一名专业的乒乓球教练和运动动作分析专家。
 
 请根据下方提供的上下文信息，对用户的输入进行分析，并用**纯文本格式**撰写你的回答。你的回答应由结构清晰的段落组成，每个段落之间用两个换行符（\\n\\n）分隔。
@@ -152,8 +154,6 @@ def chat():
 
 输出（请使用纯文本格式，段落之间）：
 """
-
-
 
     def generate_openai():
         try:
@@ -211,31 +211,34 @@ def load_dataset_embedding_route():
         index_count = _INDEX_CACHE.ntotal if hasattr(_INDEX_CACHE, "ntotal") else 0
         lines_count = len(_LINES_CACHE) if _LINES_CACHE is not None else 0
 
-        return jsonify({
-            "status": "success",
-            "message": "Dataset embedding loaded successfully!",
-            "index_cache_length": index_count,
-            "lines_cache_length": lines_count,
-        })
+        return jsonify(
+            {
+                "status": "success",
+                "message": "Dataset embedding loaded successfully!",
+                "index_cache_length": index_count,
+                "lines_cache_length": lines_count,
+            }
+        )
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 500
 
 
-@rag_bp.route("/generate_report", methods=["POST"])
-def generate_report():
-    auth_header = request.headers.get('Authorization')
-    token = auth_header.split(' ')[1]
-    payload = decode(token, BaseConfig.SECRET_KEY, algorithms=["HS256"])
-    user_phone = payload['phone']
+@rag_bp.route("/load_report", methods=["POST"])
+def load_report():
+    if _report_paths == []:
+        return jsonify({"status": "error", "error": "No report found"}), 400 
+    elif _N == 0:
+        report_path = _report_paths[0]
+    else:
+        report_path = _report_paths[_N - 1]
+    with open(report_path, "rb") as f:
+        content = f.read()
+    return jsonify({"status": "success", "report": content})
 
-    user = User.query.filter_by(phone=user_phone).first()
-    if not user:
-        return jsonify({"success": False, "message": "用户不存在"}), 404
-    pose_video_path = os.path.join(BaseConfig.POSE_FOLDER, f"user_{user.user_id}")
-    json_files = [f.name for f in pose_video_path.glob("*.json")]
-    file_path = f"{pose_video_path}/{json_files[0]}"
+
+def generate_report(file_path, user_id, filename):
     if not os.path.exists(file_path):
-        return jsonify({"status": "error", "error": "File not found"}), 404
+        return {"status": "error", "error": "File not found"}, 404
     else:
         skeleton_instances, meta_info = load_skeleton_keypoint(file_path)
     client = OpenAI(
@@ -246,7 +249,7 @@ def generate_report():
 
     batch_size = 5
     # for i in range(0, len(skeleton_instances), batch_size):
-    for i in range(0, 20, batch_size):
+    for i in range(0, 10, batch_size):
         batch_instances = skeleton_instances[i : i + batch_size]
 
         # Build system prompt for the current batch of frames
@@ -334,4 +337,18 @@ def generate_report():
         ],
         stream=False,
     )
-    return jsonify({"report": response.choices[0].message.content})
+    report = response.choices[0].message.content
+    pose_user_dir = Path(BaseConfig.POSE_FOLDER) / f"user_{user_id}"
+    with open(
+        f"{pose_user_dir} / results_"
+        + f"{os.path.splitext(os.path.basename(filename))[0]}.md",
+        "w",
+    ) as f:
+        f.write(report)
+
+    _report_paths.append(
+        f"{pose_user_dir} / results_"
+        + f"{os.path.splitext(os.path.basename(filename))[0]}.md"
+    )
+    _N += 1
+    return report
